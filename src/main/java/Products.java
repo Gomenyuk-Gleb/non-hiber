@@ -18,8 +18,7 @@ public class Products {
 
     @Colum("price")
     private Integer price;
-    @Colum("created_at")
-
+    @Colum(value = "created_at", autoGeneration = true)
     private Date createdAt;
 
     public Integer getId() {
