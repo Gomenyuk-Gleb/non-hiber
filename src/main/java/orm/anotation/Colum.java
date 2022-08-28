@@ -7,4 +7,6 @@ import java.lang.annotation.RetentionPolicy;
 public @interface Colum {
 
     String value();
+
+    boolean autoGeneration() default false;
 }

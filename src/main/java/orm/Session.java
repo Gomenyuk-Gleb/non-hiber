@@ -2,8 +2,13 @@ package orm;
 
 import orm.anotation.Colum;
 import orm.anotation.Table;
+import orm.service.ActionPriority;
+import orm.service.ActionService;
+import orm.service.impl.DeleteAction;
+import orm.service.impl.InsertAction;
 
 import javax.sql.DataSource;
+import javax.swing.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.sql.*;
@@ -16,6 +21,8 @@ public class Session {
     private final HashMap<EntityKey<?>, Object> entityList = new HashMap<>();
     private final HashMap<EntityKey<?>, Object[]> entityName = new HashMap<>();
     private final HashMap<EntityKey<?>, Map<String, String>> fieldToUpdate = new HashMap<>();
+
+    private final List<ActionService> actions = new ArrayList<>();
 
 
     public Session(DataSource dataSource) {
@@ -81,6 +88,8 @@ public class Session {
                     }
                 })
                 .forEach(this::updateEntity);
+
+        flush();
     }
 
     private void updateEntity(Map.Entry<EntityKey<?>, Object> entityKeyObjectEntry) {
@@ -144,5 +153,42 @@ public class Session {
             fieldToUpdate.put(en.getKey(), stringStringMap);
 
         return readyToUpdate;
+    }
+
+    public void persist(Object o) {
+        InsertAction action = new InsertAction(this, o);
+        actions.add(action);
+    }
+    public void remove(Object o) {
+        DeleteAction action = new DeleteAction(this, o);
+        actions.add(action);
+    }
+
+    public void doIt(String sql) {
+        try (Connection connection = dataSource.getConnection()) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute(sql);
+
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw new RuntimeException();
+        }
+    }
+
+    public void removeAction(ActionService action){
+        actions.remove(action);
+    }
+
+    public void flush() {
+        actions.stream()
+                .sorted(Comparator.comparing(x -> x.getPriority().priority))
+                .forEach(x -> {
+                    try {
+                        x.sendRequest();
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 }
